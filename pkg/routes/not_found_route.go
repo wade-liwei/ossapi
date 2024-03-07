@@ -14,6 +14,6 @@ func PublicRoutes(a *fiber.App) {
 	route := a.Group("/api/v1")
 
 	// upload files
-	route.Post("/upload/privatedownload", app.PrivateDownloadFile)
-	//route.Post("/upload/publicdownload", app.)
+	route.Post("/upload/private-download", app.PrivateDownloadFile)
+	route.Post("/upload/public-download", app.PublicDownload)
 }
