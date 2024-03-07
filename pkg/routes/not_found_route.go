@@ -16,4 +16,7 @@ func PublicRoutes(a *fiber.App) {
 	// upload files
 	route.Post("/upload/private-download", app.PrivateDownloadFile)
 	route.Post("/upload/public-download", app.PublicDownload)
+
+	route.Get("/presignedGetObject", app.PresignedGetObject)
+
 }
