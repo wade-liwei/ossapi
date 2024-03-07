@@ -3,7 +3,6 @@ package app
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/url"
 	"os"
@@ -20,12 +19,12 @@ func PrivateDownloadFile(c *fiber.Ctx) error {
 	//bucketName := os.Getenv("MINIO_BUCKET")
 	//MINIO_PRIVATE_DOWNLOAD_BUCKET
 
-	bucketName := c.Query("bucket")
+	//bucketName := c.Query("bucket")
 
 	var minioClient *minio.Client
 	var err error
 
-	fmt.Println("bucketName", bucketName, len(bucketName))
+	//fmt.Println("bucketName", bucketName, len(bucketName))
 
 	//file, err := c.FormFile("fileUpload")
 
@@ -54,26 +53,55 @@ func PrivateDownloadFile(c *fiber.Ctx) error {
 	contentType := file.Header["Content-Type"][0]
 	fileSize := file.Size
 
-	if len(bucketName) == 0 {
-		bucketName = os.Getenv("MINIO_PRIVATE_DOWNLOAD_BUCKET")
-		// Create minio connection.
-		minioClient, err = minioUpload.PrivateMinioConnection()
-		if err != nil {
-			// Return status 500 and minio connection error.
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": true,
-				"msg":   err.Error(),
-			})
-		}
-	} else {
-		minioClient, err = minioUpload.MinioConnection(bucketName)
-		if err != nil {
-			// Return status 500 and minio connection error.
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": true,
-				"msg":   err.Error(),
-			})
-		}
+	bucketName := os.Getenv("MINIO_BUCKET")
+	// Create minio connection.
+	minioClient, err = minioUpload.PrivateMinioConnection()
+	if err != nil {
+		// Return status 500 and minio connection error.
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": true,
+			"msg":   err.Error(),
+		})
+	}
+
+	// if len(bucketName) == 0 {
+	// 	bucketName = os.Getenv("MINIO_PRIVATE_DOWNLOAD_BUCKET")
+	// 	// Create minio connection.
+	// 	minioClient, err = minioUpload.PrivateMinioConnection()
+	// 	if err != nil {
+	// 		// Return status 500 and minio connection error.
+	// 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+	// 			"error": true,
+	// 			"msg":   err.Error(),
+	// 		})
+	// 	}
+	// } else {
+	// 	minioClient, err = minioUpload.MinioConnection(bucketName)
+	// 	if err != nil {
+	// 		// Return status 500 and minio connection error.
+	// 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+	// 			"error": true,
+	// 			"msg":   err.Error(),
+	// 		})
+	// 	}
+	// }
+
+	expiresAsStr := c.Query("expires", "1800")
+
+	expiresNum, err := strconv.Atoi(expiresAsStr)
+	if err != nil {
+
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": true,
+			"msg":   "query param expires is not valid, err: " + err.Error(),
+		})
+	}
+
+	if len(objectName) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": true,
+			"msg":   "must provide  query param 'object' .",
+		})
 	}
 
 	// Upload the zip file with PutObject
@@ -93,7 +121,7 @@ func PrivateDownloadFile(c *fiber.Ctx) error {
 
 	// Gernerate presigned get object url.
 	//presignedURL, err := minioClient.PresignedGetObject(context.Background(), bucketName, objectName, time.Duration(1000)*time.Second, reqParams)
-	presignedURL, err := minioClient.PresignedGetObject(context.Background(), bucketName, objectName, time.Duration(1000)*time.Second, reqParams)
+	presignedURL, err := minioClient.PresignedGetObject(context.Background(), bucketName, objectName, time.Duration(expiresNum)*time.Second, reqParams)
 
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -110,134 +138,134 @@ func PrivateDownloadFile(c *fiber.Ctx) error {
 	return c.SendString(presignedURL.String())
 }
 
-func PublicDownload(c *fiber.Ctx) error {
-	ctx := context.Background()
-	bucketName := os.Getenv("MINIO_PUBLIC_DOWNLOAD_BUCKET")
-	//file, err := c.FormFile("fileUpload")
+// func PublicDownload(c *fiber.Ctx) error {
+// 	ctx := context.Background()
+// 	bucketName := os.Getenv("MINIO_PUBLIC_DOWNLOAD_BUCKET")
+// 	//file, err := c.FormFile("fileUpload")
 
-	fmt.Println("bucketName", bucketName, len(bucketName))
+// 	fmt.Println("bucketName", bucketName, len(bucketName))
 
-	file, err := c.FormFile("file")
+// 	file, err := c.FormFile("file")
 
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": true,
-			"msg":   err.Error(),
-		})
-	}
+// 	if err != nil {
+// 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+// 			"error": true,
+// 			"msg":   err.Error(),
+// 		})
+// 	}
 
-	// Get Buffer from file
-	buffer, err := file.Open()
+// 	// Get Buffer from file
+// 	buffer, err := file.Open()
 
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": true,
-			"msg":   err.Error(),
-		})
-	}
-	defer buffer.Close()
+// 	if err != nil {
+// 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+// 			"error": true,
+// 			"msg":   err.Error(),
+// 		})
+// 	}
+// 	defer buffer.Close()
 
-	// Create minio connection.
-	minioClient, err := minioUpload.PublicMinioConnection()
-	if err != nil {
-		// Return status 500 and minio connection error.
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": true,
-			"msg":   err.Error(),
-		})
-	}
+// 	// Create minio connection.
+// 	minioClient, err := minioUpload.PublicMinioConnection()
+// 	if err != nil {
+// 		// Return status 500 and minio connection error.
+// 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+// 			"error": true,
+// 			"msg":   err.Error(),
+// 		})
+// 	}
 
-	objectName := file.Filename
-	fileBuffer := buffer
-	contentType := file.Header["Content-Type"][0]
-	fileSize := file.Size
+// 	objectName := file.Filename
+// 	fileBuffer := buffer
+// 	contentType := file.Header["Content-Type"][0]
+// 	fileSize := file.Size
 
-	// Upload the zip file with PutObject
-	info, err := minioClient.PutObject(ctx, bucketName, objectName, fileBuffer, fileSize, minio.PutObjectOptions{ContentType: contentType})
+// 	// Upload the zip file with PutObject
+// 	info, err := minioClient.PutObject(ctx, bucketName, objectName, fileBuffer, fileSize, minio.PutObjectOptions{ContentType: contentType})
 
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": true,
-			"msg":   err.Error(),
-		})
-	}
+// 	if err != nil {
+// 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+// 			"error": true,
+// 			"msg":   err.Error(),
+// 		})
+// 	}
 
-	_ = info
+// 	_ = info
 
-	fmt.Println("minioClient.EndpointURL()--------", minioClient.EndpointURL())
+// 	fmt.Println("minioClient.EndpointURL()--------", minioClient.EndpointURL())
 
-	return c.SendString(minioClient.EndpointURL().String() + "/" + bucketName + "/" + objectName)
-}
+// 	return c.SendString(minioClient.EndpointURL().String() + "/" + bucketName + "/" + objectName)
+// }
 
 // http://192.168.1.21:13000/api/v1/presignedGetObject?bucket=Peter&object=123&expires=123
-func PresignedGetObject(c *fiber.Ctx) error {
+// func PresignedGetObject(c *fiber.Ctx) error {
 
-	//c.Params()
-	bucketName := c.Query("bucket")
-	objectName := c.Query("object")
-	expiresAsStr := c.Query("expires")
+// 	//c.Params()
+// 	bucketName := c.Query("bucket")
+// 	objectName := c.Query("object")
+// 	expiresAsStr := c.Query("expires")
 
-	expiresNum, err := strconv.Atoi(expiresAsStr)
-	if err != nil {
+// 	expiresNum, err := strconv.Atoi(expiresAsStr)
+// 	if err != nil {
 
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": true,
-			"msg":   "query param expires is not valid, err: " + err.Error(),
-		})
-	}
+// 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+// 			"error": true,
+// 			"msg":   "query param expires is not valid, err: " + err.Error(),
+// 		})
+// 	}
 
-	if len(objectName) == 0 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": true,
-			"msg":   "must provide  query param 'object' .",
-		})
-	}
+// 	if len(objectName) == 0 {
+// 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+// 			"error": true,
+// 			"msg":   "must provide  query param 'object' .",
+// 		})
+// 	}
 
-	var minioClient *minio.Client
+// 	var minioClient *minio.Client
 
-	if len(bucketName) == 0 {
+// 	if len(bucketName) == 0 {
 
-		bucketName = os.Getenv("MINIO_PRIVATE_DOWNLOAD_BUCKET")
+// 		bucketName = os.Getenv("MINIO_PRIVATE_DOWNLOAD_BUCKET")
 
-		// Create minio connection.
-		minioClient, err = minioUpload.PrivateMinioConnection()
-		if err != nil {
-			// Return status 500 and minio connection error.
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": true,
-				"msg":   err.Error(),
-			})
-		}
-	} else {
-		minioClient, err = minioUpload.MinioConnection(bucketName)
-		if err != nil {
-			// Return status 500 and minio connection error.
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": true,
-				"msg":   err.Error(),
-			})
-		}
-	}
+// 		// Create minio connection.
+// 		minioClient, err = minioUpload.PrivateMinioConnection()
+// 		if err != nil {
+// 			// Return status 500 and minio connection error.
+// 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+// 				"error": true,
+// 				"msg":   err.Error(),
+// 			})
+// 		}
+// 	} else {
+// 		minioClient, err = minioUpload.MinioConnection(bucketName)
+// 		if err != nil {
+// 			// Return status 500 and minio connection error.
+// 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+// 				"error": true,
+// 				"msg":   err.Error(),
+// 			})
+// 		}
+// 	}
 
-	// Set request parameters
-	reqParams := make(url.Values)
+// 	// Set request parameters
+// 	reqParams := make(url.Values)
 
-	reqParams.Set("response-content-disposition", "attachment; filename="+objectName)
+// 	reqParams.Set("response-content-disposition", "attachment; filename="+objectName)
 
-	presignedURL, err := minioClient.PresignedGetObject(context.Background(), bucketName, objectName, time.Duration(expiresNum)*time.Second, reqParams)
+// 	presignedURL, err := minioClient.PresignedGetObject(context.Background(), bucketName, objectName, time.Duration(expiresNum)*time.Second, reqParams)
 
-	if err != nil {
-		//log.Fatalln(err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": true,
-			"msg":   err.Error(),
-		})
-	}
-	log.Println(presignedURL)
-	log.Println(presignedURL.String())
+// 	if err != nil {
+// 		//log.Fatalln(err)
+// 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+// 			"error": true,
+// 			"msg":   err.Error(),
+// 		})
+// 	}
+// 	log.Println(presignedURL)
+// 	log.Println(presignedURL.String())
 
-	//log.Printf("Successfully uploaded %s of size %d\n", objectName, info.Size)
+// 	//log.Printf("Successfully uploaded %s of size %d\n", objectName, info.Size)
 
-	return c.SendString(presignedURL.String())
+// 	return c.SendString(presignedURL.String())
 
-}
+// }
